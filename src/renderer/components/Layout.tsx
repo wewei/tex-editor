@@ -1,11 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Box, Divider } from '@mui/material';
+import { Box, Divider, Snackbar, Alert } from '@mui/material';
 import Editor from '@monaco-editor/react';
+import PDFViewer from './PDFViewer';
+import { debounce } from 'lodash';
+
+const defaultContent = `
+\\documentclass{article}
+\\usepackage{ctex}  % 支持中文
+\\usepackage[utf8]{inputenc}  % UTF-8编码
+\\usepackage[T1]{fontenc}     % 字体编码
+
+\\begin{document}
+Hello, world! 你好，世界！
+\\end{document}
+`
 
 const Layout: React.FC = () => {
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [splitRatio, setSplitRatio] = useState(0.5);
   const [isDragging, setIsDragging] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState<string>('');
+  const [error, setError] = useState<string | null>(null);
+  const [isCompiling, setIsCompiling] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -43,6 +59,36 @@ const Layout: React.FC = () => {
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
+  const compileTeX = useCallback(async (content: string) => {
+    try {
+      setIsCompiling(true);
+      const result = await window.electronAPI.compileLaTeX(content);
+      
+      if (result.success && result.pdfPath) {
+        setPdfUrl(result.pdfPath);
+        setError(null);
+      } else {
+        setError(result.error || '编译失败');
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '编译过程出错');
+    } finally {
+      setIsCompiling(false);
+    }
+  }, []);
+
+  // 使用 debounce 包装编译函数
+  const debouncedCompile = useCallback(
+    debounce((content: string) => compileTeX(content), 3000),
+    [compileTeX]
+  );
+
+  const handleEditorChange = useCallback((value: string | undefined) => {
+    if (value) {
+      debouncedCompile(value);
+    }
+  }, [debouncedCompile]);
+
   return (
     <Box
       sx={{
@@ -57,19 +103,38 @@ const Layout: React.FC = () => {
           width: `${splitRatio * 100}%`,
           height: '100%',
           overflow: 'hidden',
+          position: 'relative',
         }}
       >
         <Editor
           height="100%"
           defaultLanguage="latex"
-          defaultValue="% 在这里输入 LaTeX 代码"
+          defaultValue={defaultContent}
           theme="vs-dark"
           options={{
             minimap: { enabled: false },
             fontSize: 14,
             wordWrap: 'on',
           }}
+          onChange={handleEditorChange}
         />
+        {isCompiling && (
+          <Box
+            sx={{
+              position: 'absolute',
+              bottom: 16,
+              right: 16,
+              bgcolor: 'info.main',
+              color: 'info.contrastText',
+              px: 2,
+              py: 1,
+              borderRadius: 1,
+              fontSize: 14,
+            }}
+          >
+            正在编译...
+          </Box>
+        )}
       </Box>
 
       <Divider
@@ -105,13 +170,22 @@ const Layout: React.FC = () => {
       <Box
         sx={{
           flex: 1,
-          p: 2,
-          overflow: 'auto',
+          height: '100%',
+          overflow: 'hidden',
         }}
       >
-        {/* 右侧预览区域 */}
-        <Box>预览区域</Box>
+        <PDFViewer pdfUrl={pdfUrl} />
       </Box>
+
+      <Snackbar
+        open={!!error}
+        autoHideDuration={6000}
+        onClose={() => setError(null)}
+      >
+        <Alert severity="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
