@@ -1,4 +1,4 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, protocol } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import './latex';
@@ -7,6 +7,20 @@ import './latex';
 if (started) {
   app.quit();
 }
+
+// 注册自定义协议
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'asset',
+    privileges: {
+      secure: true,
+      standard: true,
+      supportFetchAPI: true,
+      stream: true,
+      bypassCSP: true,
+    }
+  }
+]);
 
 const createWindow = () => {
   // Create the browser window.
@@ -34,7 +48,23 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+app.whenReady().then(() => {
+  // 注册协议处理器
+  protocol.registerFileProtocol('asset', (request, callback) => {
+    try {
+      const filePath = request.url.replace('asset://', '');
+      // 移除可能的尾部斜杠
+      const cleanPath = filePath.replace(/\/$/, '');
+      const fullPath = path.join(app.getPath('temp'), 'tex-editor', cleanPath);
+      callback(fullPath);
+    } catch (error) {
+      console.error('Protocol handler error:', error);
+      callback({ error: -2 /* net::ERR_FILE_NOT_FOUND */ });
+    }
+  });
+
+  createWindow();
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

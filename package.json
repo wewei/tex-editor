@@ -51,7 +51,7 @@
     "iconv-lite": "^0.6.3",
     "lodash": "^4.17.21",
     "monaco-editor": "^0.52.2",
-    "pdfjs-dist": "^5.0.375",
+    "pdfjs-dist": "^4.8.69",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-pdf": "^9.2.1",

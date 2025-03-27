@@ -20,7 +20,8 @@ async function compileLaTeX(content: string): Promise<{ success: boolean; pdfPat
   
   const timestamp = Date.now();
   const texFile = path.join(TEMP_DIR, `document_${timestamp}.tex`);
-  const pdfFile = path.join(TEMP_DIR, `document_${timestamp}.pdf`);
+  const pdfFileName = `document_${timestamp}.pdf`;
+  const pdfFile = path.join(TEMP_DIR, pdfFileName);
 
   try {
     await writeFile(texFile, content, { encoding: 'utf8' });
@@ -57,7 +58,7 @@ async function compileLaTeX(content: string): Promise<{ success: boolean; pdfPat
           } else {
             resolve({
               success: true,
-              pdfPath: `file://${pdfFile}`
+              pdfPath: `asset://${pdfFileName}`
             });
           }
         }
